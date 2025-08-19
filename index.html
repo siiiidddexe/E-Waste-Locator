@@ -21,6 +21,93 @@
             }
         }
     </script>
+    <style>
+        /* Custom CSS for filters */
+        .filter-bubble {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filter-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .filter-toggle {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .filter-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(16, 185, 129, 0.4);
+        }
+        
+        .range-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e5e7eb;
+            outline: none;
+        }
+        
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .range-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .filter-tag {
+            background: linear-gradient(135deg, #10b981, #059669);
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .facility-card {
+            transition: all 0.2s ease;
+        }
+        
+        .facility-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .filter-section {
+            border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+        }
+        
+        .filter-section:last-child {
+            border-bottom: none;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 min-h-screen">
     <!-- Header -->
@@ -58,6 +145,11 @@
                     <span id="statusText" class="font-medium"></span>
                 </div>
             </div>
+            
+            <!-- Active Filters -->
+            <div id="activeFilters" class="mt-4 hidden">
+                <div class="flex flex-wrap gap-2" id="filterTags"></div>
+            </div>
         </div>
 
         <!-- Map Card -->
@@ -69,12 +161,135 @@
         <div id="resultsSection" class="hidden">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-2xl font-bold text-gray-800">Nearby Facilities</h2>
-                <div class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
-                    Within 5km
+                <div id="resultCount" class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
+                    0 Results
                 </div>
             </div>
             
             <div id="facilityList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- Filter Toggle Button -->
+    <div class="fixed bottom-6 right-6 z-50">
+        <button id="filterToggle" class="filter-toggle w-14 h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:shadow-2xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Filter Panel -->
+    <div id="filterPanel" class="fixed inset-y-0 right-0 z-50 w-80 transform translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="filter-panel h-full rounded-l-3xl overflow-y-auto">
+            <!-- Filter Header -->
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-800">Filters</h3>
+                    <button id="closeFilter" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filter Content -->
+            <div class="p-6 space-y-6">
+                <!-- Distance Filter -->
+                <div class="filter-section pb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Distance Range</h4>
+                    <div class="space-y-3">
+                        <input type="range" id="distanceRange" min="1" max="20" value="5" class="range-slider">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>1 km</span>
+                            <span id="distanceValue" class="font-medium text-emerald-600">5 km</span>
+                            <span>20 km</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rating Filter -->
+                <div class="filter-section pb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Minimum Rating</h4>
+                    <div class="space-y-3">
+                        <input type="range" id="ratingRange" min="0" max="5" step="0.5" value="0" class="range-slider">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Any</span>
+                            <span id="ratingValue" class="font-medium text-emerald-600">Any Rating</span>
+                            <span>5 ⭐</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opening Hours Filter -->
+                <div class="filter-section pb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Opening Status</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="radio" name="openStatus" value="all" checked class="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500">
+                            <span class="text-gray-700">Show All</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="radio" name="openStatus" value="open" class="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500">
+                            <span class="text-gray-700">Open Now Only</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="radio" name="openStatus" value="closed" class="w-4 h-4 text-emerald-500 border-gray-300 focus:ring-emerald-500">
+                            <span class="text-gray-700">Closed Now Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Price Level Filter -->
+                <div class="filter-section pb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Price Level</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" value="0" class="price-level w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500">
+                            <span class="text-gray-700">Free</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" value="1" class="price-level w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500">
+                            <span class="text-gray-700">$ - Inexpensive</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" value="2" class="price-level w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500">
+                            <span class="text-gray-700">$$ - Moderate</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" value="3" class="price-level w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500">
+                            <span class="text-gray-700">$$$ - Expensive</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" value="4" class="price-level w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500">
+                            <span class="text-gray-700">$$$$ - Very Expensive</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Sort Options -->
+                <div class="filter-section pb-6">
+                    <h4 class="font-medium text-gray-800 mb-3">Sort By</h4>
+                    <select id="sortBy" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        <option value="distance">Distance (Nearest First)</option>
+                        <option value="rating">Rating (Highest First)</option>
+                        <option value="name">Name (A-Z)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Filter Actions -->
+            <div class="p-6 border-t border-gray-200">
+                <div class="flex space-x-3">
+                    <button id="clearFilters" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-xl transition-colors">
+                        Clear All
+                    </button>
+                    <button id="applyFilters" class="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-xl transition-colors">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -116,8 +331,19 @@
         let userLocation;
         let service;
         let markers = [];
+        let allFacilities = [];
+        let filteredFacilities = [];
         
         const API_KEY = 'AIzaSyAWtEU1956MKost8rDCGnO8jmY8lfO_S4k';
+        
+        // Filter state
+        const filters = {
+            maxDistance: 5,
+            minRating: 0,
+            openStatus: 'all',
+            priceLevels: [],
+            sortBy: 'distance'
+        };
         
         // Initialize Google Maps
         function initMap() {
@@ -225,20 +451,19 @@
         function searchEWasteFacilities() {
             if (!userLocation) return;
             
-            markers.forEach(marker => marker.setMap(null));
-            markers = [];
+            clearMarkers();
+            allFacilities = [];
             
             const request = {
                 location: userLocation,
-                radius: 5000,
+                radius: 20000, // Search in larger radius initially
                 keyword: 'e-waste recycling electronic waste disposal computer recycling',
                 type: 'store'
             };
             
             service.nearbySearch(request, (results, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
-                    displayFacilities(results);
-                    showStatus('success', `Found ${results.length} facilities`);
+                    processFacilities(results);
                 } else {
                     searchAlternativeTerms();
                 }
@@ -254,7 +479,7 @@
             terms.forEach(term => {
                 const request = {
                     location: userLocation,
-                    radius: 5000,
+                    radius: 20000,
                     keyword: term,
                     type: 'store'
                 };
@@ -267,8 +492,7 @@
                     
                     if (completed === terms.length) {
                         if (allResults.length > 0) {
-                            displayFacilities(allResults);
-                            showStatus('success', `Found ${allResults.length} facilities`);
+                            processFacilities(allResults);
                         } else {
                             showNoResults();
                         }
@@ -277,90 +501,290 @@
             });
         }
         
-        // Display facilities
-        function displayFacilities(facilities) {
-            const facilityList = document.getElementById('facilityList');
-            const resultsSection = document.getElementById('resultsSection');
-            
-            facilityList.innerHTML = '';
-            resultsSection.style.display = 'block';
-            
+        // Process and store facilities data
+        function processFacilities(facilities) {
             const uniqueFacilities = facilities.filter((facility, index, self) =>
                 index === self.findIndex(f => f.place_id === facility.place_id)
             );
             
-            uniqueFacilities.forEach(facility => {
+            allFacilities = uniqueFacilities.map(facility => {
                 const distance = calculateDistance(
                     userLocation.lat, userLocation.lng,
                     facility.geometry.location.lat(),
                     facility.geometry.location.lng()
                 );
                 
-                if (distance <= 5) {
-                    // Add marker
-                    const marker = new google.maps.Marker({
-                        position: facility.geometry.location,
-                        map: map,
-                        title: facility.name,
-                        icon: {
-                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#dc2626">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                                </svg>
-                            `),
-                            scaledSize: new google.maps.Size(20, 20)
-                        }
-                    });
-                    
-                    markers.push(marker);
-                    marker.addListener('click', () => showFacilityDetails(facility, distance));
-                    
-                    // Create facility card
-                    const card = document.createElement('div');
-                    card.className = 'bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md border border-white/50 hover:shadow-lg hover:scale-[0.99] transition-all duration-200 cursor-pointer';
-                    card.onclick = () => showFacilityDetails(facility, distance);
-                    
-                    const rating = facility.rating ? facility.rating.toFixed(1) : 'N/A';
-                    const isOpen = facility.opening_hours?.open_now;
-                    
-                    card.innerHTML = `
-                        <div class="flex items-start justify-between mb-3">
-                            <div class="flex-1 pr-4">
-                                <h3 class="font-semibold text-lg text-gray-800 leading-tight mb-1">${facility.name}</h3>
-                                <p class="text-gray-600 text-sm leading-relaxed">${facility.vicinity || 'Address not available'}</p>
-                            </div>
-                            <div class="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap">
-                                ${distance.toFixed(1)} km
-                            </div>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-4">
-                                <div class="flex items-center space-x-1 text-amber-500">
-                                    <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
-                                    </svg>
-                                    <span class="text-sm font-medium text-gray-700">${rating}</span>
-                                </div>
-                                ${isOpen !== undefined ? `
-                                    <div class="flex items-center space-x-1">
-                                        <div class="w-2 h-2 rounded-full ${isOpen ? 'bg-green-400' : 'bg-red-400'}"></div>
-                                        <span class="text-sm text-gray-600">${isOpen ? 'Open' : 'Closed'}</span>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </div>
-                    `;
-                    
-                    facilityList.appendChild(card);
-                }
+                return {
+                    ...facility,
+                    distance: distance,
+                    rating: facility.rating || 0,
+                    price_level: facility.price_level !== undefined ? facility.price_level : -1,
+                    is_open: facility.opening_hours?.open_now
+                };
             });
             
+            applyFiltersAndDisplay();
+            showStatus('success', `Found ${allFacilities.length} facilities`);
             document.getElementById('locationBtn').disabled = false;
+        }
+        
+        // Apply filters and display results
+        function applyFiltersAndDisplay() {
+            if (allFacilities.length === 0) return;
+            
+            // Apply filters
+            filteredFacilities = allFacilities.filter(facility => {
+                // Distance filter
+                if (facility.distance > filters.maxDistance) return false;
+                
+                // Rating filter
+                if (filters.minRating > 0 && facility.rating < filters.minRating) return false;
+                
+                // Opening hours filter
+                if (filters.openStatus === 'open' && !facility.is_open) return false;
+                if (filters.openStatus === 'closed' && facility.is_open) return false;
+                
+                // Price level filter
+                if (filters.priceLevels.length > 0) {
+                    if (facility.price_level === -1) return false;
+                    if (!filters.priceLevels.includes(facility.price_level.toString())) return false;
+                }
+                
+                return true;
+            });
+            
+            // Sort facilities
+            sortFacilities();
+            
+            // Display results
+            displayFacilities(filteredFacilities);
+            updateActiveFilters();
+            updateResultCount();
+        }
+        
+        // Sort facilities based on selected criteria
+        function sortFacilities() {
+            filteredFacilities.sort((a, b) => {
+                switch (filters.sortBy) {
+                    case 'distance':
+                        return a.distance - b.distance;
+                    case 'rating':
+                        return (b.rating || 0) - (a.rating || 0);
+                    case 'name':
+                        return a.name.localeCompare(b.name);
+                    default:
+                        return a.distance - b.distance;
+                }
+            });
+        }
+        
+        // Display facilities
+        function displayFacilities(facilities) {
+            clearMarkers();
+            
+            const facilityList = document.getElementById('facilityList');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            facilityList.innerHTML = '';
+            
+            if (facilities.length === 0) {
+                showNoResults();
+                return;
+            }
+            
+            resultsSection.style.display = 'block';
+            
+            facilities.forEach(facility => {
+                // Add marker
+                const marker = new google.maps.Marker({
+                    position: facility.geometry.location,
+                    map: map,
+                    title: facility.name,
+                    icon: {
+                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#dc2626">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                            </svg>
+                        `),
+                        scaledSize: new google.maps.Size(20, 20)
+                    }
+                });
+                
+                markers.push(marker);
+                marker.addListener('click', () => showFacilityDetails(facility, facility.distance));
+                
+                // Create facility card
+                const card = document.createElement('div');
+                card.className = 'facility-card bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md border border-white/50 hover:shadow-lg cursor-pointer';
+                card.onclick = () => showFacilityDetails(facility, facility.distance);
+                
+                const rating = facility.rating ? facility.rating.toFixed(1) : 'N/A';
+                const isOpen = facility.is_open;
+                const priceLevel = getPriceLevelText(facility.price_level);
+                
+                card.innerHTML = `
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex-1 pr-4">
+                            <h3 class="font-semibold text-lg text-gray-800 leading-tight mb-1">${facility.name}</h3>
+                            <p class="text-gray-600 text-sm leading-relaxed">${facility.vicinity || 'Address not available'}</p>
+                        </div>
+                        <div class="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap">
+                            ${facility.distance.toFixed(1)} km
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-1 text-amber-500">
+                                <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-700">${rating}</span>
+                            </div>
+                            ${priceLevel ? `
+                                <div class="text-sm text-gray-600 font-medium">${priceLevel}</div>
+                            ` : ''}
+                            ${isOpen !== undefined ? `
+                                <div class="flex items-center space-x-1">
+                                    <div class="w-2 h-2 rounded-full ${isOpen ? 'bg-green-400' : 'bg-red-400'}"></div>
+                                    <span class="text-sm text-gray-600">${isOpen ? 'Open' : 'Closed'}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </div>
+                `;
+                
+                facilityList.appendChild(card);
+            });
+        }
+        
+        // Clear all markers from map
+        function clearMarkers() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+        }
+        
+        // Get price level text
+        function getPriceLevelText(priceLevel) {
+            switch (priceLevel) {
+                case 0: return 'Free';
+                case 1: return '$';
+                case 2: return '$$';
+                case 3: return '$$$';
+                case 4: return '$$$$';
+                default: return null;
+            }
+        }
+        
+        // Update active filters display
+        function updateActiveFilters() {
+            const activeFiltersDiv = document.getElementById('activeFilters');
+            const filterTags = document.getElementById('filterTags');
+            
+            filterTags.innerHTML = '';
+            let hasActiveFilters = false;
+            
+            // Distance filter
+            if (filters.maxDistance !== 5) {
+                addFilterTag(`Within ${filters.maxDistance} km`, () => {
+                    filters.maxDistance = 5;
+                    document.getElementById('distanceRange').value = 5;
+                    updateDistanceValue();
+                    applyFiltersAndDisplay();
+                });
+                hasActiveFilters = true;
+            }
+            
+            // Rating filter
+            if (filters.minRating > 0) {
+                addFilterTag(`${filters.minRating}+ stars`, () => {
+                    filters.minRating = 0;
+                    document.getElementById('ratingRange').value = 0;
+                    updateRatingValue();
+                    applyFiltersAndDisplay();
+                });
+                hasActiveFilters = true;
+            }
+            
+            // Opening status filter
+            if (filters.openStatus !== 'all') {
+                const statusText = filters.openStatus === 'open' ? 'Open Now' : 'Closed Now';
+                addFilterTag(statusText, () => {
+                    filters.openStatus = 'all';
+                    document.querySelector('input[name="openStatus"][value="all"]').checked = true;
+                    applyFiltersAndDisplay();
+                });
+                hasActiveFilters = true;
+            }
+            
+            // Price level filter
+            if (filters.priceLevels.length > 0) {
+                const priceText = filters.priceLevels.map(level => getPriceLevelText(parseInt(level))).join(', ');
+                addFilterTag(`Price: ${priceText}`, () => {
+                    filters.priceLevels = [];
+                    document.querySelectorAll('.price-level').forEach(cb => cb.checked = false);
+                    applyFiltersAndDisplay();
+                });
+                hasActiveFilters = true;
+            }
+            
+            // Sort filter
+            if (filters.sortBy !== 'distance') {
+                const sortText = filters.sortBy === 'rating' ? 'By Rating' : 'By Name';
+                addFilterTag(`Sorted ${sortText}`, () => {
+                    filters.sortBy = 'distance';
+                    document.getElementById('sortBy').value = 'distance';
+                    applyFiltersAndDisplay();
+                });
+                hasActiveFilters = true;
+            }
+            
+            activeFiltersDiv.style.display = hasActiveFilters ? 'block' : 'none';
+        }
+        
+        // Add filter tag
+        function addFilterTag(text, removeCallback) {
+            const filterTags = document.getElementById('filterTags');
+            const tag = document.createElement('div');
+            tag.className = 'filter-tag inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm text-white font-medium';
+            tag.innerHTML = `
+                <span>${text}</span>
+                <button class="w-4 h-4 hover:bg-white/20 rounded-full flex items-center justify-center">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            `;
+            
+            tag.querySelector('button').onclick = (e) => {
+                e.stopPropagation();
+                removeCallback();
+            };
+            
+            filterTags.appendChild(tag);
+        }
+        
+        // Update result count
+        function updateResultCount() {
+            const resultCount = document.getElementById('resultCount');
+            const count = filteredFacilities.length;
+            resultCount.textContent = `${count} Result${count !== 1 ? 's' : ''}`;
+        }
+        
+        // Update distance value display
+        function updateDistanceValue() {
+            const value = document.getElementById('distanceRange').value;
+            document.getElementById('distanceValue').textContent = `${value} km`;
+        }
+        
+        // Update rating value display
+        function updateRatingValue() {
+            const value = parseFloat(document.getElementById('ratingRange').value);
+            document.getElementById('ratingValue').textContent = value === 0 ? 'Any Rating' : `${value}+ ⭐`;
         }
         
         // Show facility details modal
@@ -376,10 +800,11 @@
             
             service.getDetails({
                 placeId: facility.place_id,
-                fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'rating', 'reviews']
+                fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'rating', 'reviews', 'price_level']
             }, (place, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK) {
                     const openNow = place.opening_hours?.open_now;
+                    const priceLevel = getPriceLevelText(place.price_level);
                     modalContent.innerHTML = `
                         <div class="space-y-4">
                             <div class="flex items-start space-x-3">
@@ -443,6 +868,7 @@
                                             </svg>
                                             <span class="font-semibold text-gray-800">${place.rating}/5</span>
                                         </div>
+                                        ${priceLevel ? `<span class="text-gray-600 font-medium">${priceLevel}</span>` : ''}
                                     </div>
                                 ` : ''}
                                 
@@ -511,16 +937,79 @@
                         </svg>
                     </div>
                     <h3 class="text-lg font-semibold text-gray-800 mb-2">No facilities found</h3>
-                    <p class="text-gray-600">Try expanding your search area or contact local authorities.</p>
+                    <p class="text-gray-600">Try adjusting your filters or expanding your search area.</p>
                 </div>
             `;
             
-            showStatus('error', 'No facilities found nearby');
-            document.getElementById('locationBtn').disabled = false;
+            updateResultCount();
         }
         
         // Event listeners
         document.getElementById('locationBtn').addEventListener('click', getUserLocation);
+        
+        // Filter panel functionality
+        document.getElementById('filterToggle').addEventListener('click', () => {
+            document.getElementById('filterPanel').style.transform = 'translateX(0)';
+        });
+        
+        document.getElementById('closeFilter').addEventListener('click', () => {
+            document.getElementById('filterPanel').style.transform = 'translateX(100%)';
+        });
+        
+        // Filter controls
+        document.getElementById('distanceRange').addEventListener('input', (e) => {
+            updateDistanceValue();
+            filters.maxDistance = parseInt(e.target.value);
+        });
+        
+        document.getElementById('ratingRange').addEventListener('input', (e) => {
+            updateRatingValue();
+            filters.minRating = parseFloat(e.target.value);
+        });
+        
+        document.querySelectorAll('input[name="openStatus"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    filters.openStatus = e.target.value;
+                }
+            });
+        });
+        
+        document.querySelectorAll('.price-level').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                filters.priceLevels = Array.from(document.querySelectorAll('.price-level:checked'))
+                    .map(cb => cb.value);
+            });
+        });
+        
+        document.getElementById('sortBy').addEventListener('change', (e) => {
+            filters.sortBy = e.target.value;
+        });
+        
+        document.getElementById('applyFilters').addEventListener('click', () => {
+            applyFiltersAndDisplay();
+            document.getElementById('filterPanel').style.transform = 'translateX(100%)';
+        });
+        
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            // Reset all filters
+            filters.maxDistance = 5;
+            filters.minRating = 0;
+            filters.openStatus = 'all';
+            filters.priceLevels = [];
+            filters.sortBy = 'distance';
+            
+            // Reset UI
+            document.getElementById('distanceRange').value = 5;
+            document.getElementById('ratingRange').value = 0;
+            document.querySelector('input[name="openStatus"][value="all"]').checked = true;
+            document.querySelectorAll('.price-level').forEach(cb => cb.checked = false);
+            document.getElementById('sortBy').value = 'distance';
+            
+            updateDistanceValue();
+            updateRatingValue();
+            applyFiltersAndDisplay();
+        });
         
         // Modal functionality
         function closeModal() {
@@ -537,6 +1026,10 @@
                 closeModal();
             }
         });
+        
+        // Initialize filter values
+        updateDistanceValue();
+        updateRatingValue();
         
         // Initialize
         window.addEventListener('load', initMap);
