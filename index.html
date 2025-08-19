@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Waste Locator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'emerald': {
+                            50: '#ecfdf5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-lg border-b border-emerald-100 sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-xl flex items-center justify-center">
+                    <span class="text-xl">♻️</span>
+                </div>
+                <div class="text-center">
+                    <h1 class="text-xl font-bold text-gray-800">E-Waste Locator</h1>
+                    <p class="text-sm text-gray-600">Find recycling centers nearby</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <!-- Location Card -->
+        <div class="bg-white/70 backdrop-blur-sm rounded-3xl shadow-lg border border-white/50 p-6">
+            <button id="locationBtn" class="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[0.98] active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                <div class="flex items-center justify-center space-x-3">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>Find E-Waste Centers Near Me</span>
+                </div>
+            </button>
+            
+            <!-- Status Message -->
+            <div id="status" class="mt-4 hidden">
+                <div class="flex items-center justify-center space-x-3 p-4 rounded-2xl">
+                    <div id="statusIcon"></div>
+                    <span id="statusText" class="font-medium"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Card -->
+        <div class="bg-white/70 backdrop-blur-sm rounded-3xl shadow-lg border border-white/50 overflow-hidden">
+            <div class="h-80 md:h-96" id="map"></div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Nearby Facilities</h2>
+                <div class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-medium">
+                    Within 5km
+                </div>
+            </div>
+            
+            <div id="facilityList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- Facility Detail Modal -->
+    <div id="facilityModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"></div>
+            
+            <!-- Modal panel -->
+            <div class="inline-block align-bottom bg-white rounded-t-3xl sm:rounded-3xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-emerald-50 to-blue-50 px-6 py-4 border-b border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <h3 id="modalTitle" class="text-xl font-semibold text-gray-800"></h3>
+                        <button class="close-modal w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Content -->
+                <div id="modalContent" class="px-6 py-6 space-y-4"></div>
+                
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-4">
+                    <button class="close-modal w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-xl transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let userLocation;
+        let service;
+        let markers = [];
+        
+        const API_KEY = 'AIzaSyAWtEU1956MKost8rDCGnO8jmY8lfO_S4k';
+        
+        // Initialize Google Maps
+        function initMap() {
+            const defaultLocation = { lat: 28.6139, lng: 77.2090 }; // Delhi
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 13,
+                center: defaultLocation,
+                styles: [
+                    {
+                        featureType: 'poi',
+                        elementType: 'labels',
+                        stylers: [{ visibility: 'off' }]
+                    },
+                    {
+                        featureType: 'water',
+                        elementType: 'geometry',
+                        stylers: [{ color: '#e0f2fe' }]
+                    },
+                    {
+                        featureType: 'landscape',
+                        elementType: 'geometry',
+                        stylers: [{ color: '#f8fafc' }]
+                    },
+                    {
+                        featureType: 'road',
+                        elementType: 'geometry',
+                        stylers: [{ color: '#ffffff' }]
+                    }
+                ],
+                disableDefaultUI: true,
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false
+            });
+            
+            service = new google.maps.places.PlacesService(map);
+        }
+        
+        // Get user's current location
+        function getUserLocation() {
+            const statusDiv = document.getElementById('status');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+            const locationBtn = document.getElementById('locationBtn');
+            
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'mt-4 bg-blue-50 text-blue-700 rounded-2xl';
+            statusIcon.innerHTML = `
+                <div class="animate-spin w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full"></div>
+            `;
+            statusText.textContent = 'Getting your location...';
+            locationBtn.disabled = true;
+            
+            if (!navigator.geolocation) {
+                showStatus('error', 'Location not supported by browser');
+                locationBtn.disabled = false;
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    map.setCenter(userLocation);
+                    map.setZoom(15);
+                    
+                    // Add user location marker
+                    new google.maps.Marker({
+                        position: userLocation,
+                        map: map,
+                        icon: {
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#10b981">
+                                    <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2"/>
+                                    <circle cx="12" cy="12" r="4" fill="white"/>
+                                </svg>
+                            `),
+                            scaledSize: new google.maps.Size(24, 24)
+                        },
+                        title: 'Your Location'
+                    });
+                    
+                    showStatus('success', 'Searching for facilities...');
+                    searchEWasteFacilities();
+                },
+                (error) => {
+                    let errorMessage = 'Location access denied';
+                    if (error.code === error.POSITION_UNAVAILABLE) {
+                        errorMessage = 'Location unavailable';
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage = 'Location request timeout';
+                    }
+                    showStatus('error', errorMessage);
+                    locationBtn.disabled = false;
+                }
+            );
+        }
+        
+        // Search for e-waste facilities
+        function searchEWasteFacilities() {
+            if (!userLocation) return;
+            
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            
+            const request = {
+                location: userLocation,
+                radius: 5000,
+                keyword: 'e-waste recycling electronic waste disposal computer recycling',
+                type: 'store'
+            };
+            
+            service.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+                    displayFacilities(results);
+                    showStatus('success', `Found ${results.length} facilities`);
+                } else {
+                    searchAlternativeTerms();
+                }
+            });
+        }
+        
+        // Search with alternative terms
+        function searchAlternativeTerms() {
+            const terms = ['recycling center', 'electronics store', 'computer repair'];
+            let allResults = [];
+            let completed = 0;
+            
+            terms.forEach(term => {
+                const request = {
+                    location: userLocation,
+                    radius: 5000,
+                    keyword: term,
+                    type: 'store'
+                };
+                
+                service.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                        allResults = allResults.concat(results);
+                    }
+                    completed++;
+                    
+                    if (completed === terms.length) {
+                        if (allResults.length > 0) {
+                            displayFacilities(allResults);
+                            showStatus('success', `Found ${allResults.length} facilities`);
+                        } else {
+                            showNoResults();
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Display facilities
+        function displayFacilities(facilities) {
+            const facilityList = document.getElementById('facilityList');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            facilityList.innerHTML = '';
+            resultsSection.style.display = 'block';
+            
+            const uniqueFacilities = facilities.filter((facility, index, self) =>
+                index === self.findIndex(f => f.place_id === facility.place_id)
+            );
+            
+            uniqueFacilities.forEach(facility => {
+                const distance = calculateDistance(
+                    userLocation.lat, userLocation.lng,
+                    facility.geometry.location.lat(),
+                    facility.geometry.location.lng()
+                );
+                
+                if (distance <= 5) {
+                    // Add marker
+                    const marker = new google.maps.Marker({
+                        position: facility.geometry.location,
+                        map: map,
+                        title: facility.name,
+                        icon: {
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#dc2626">
+                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                </svg>
+                            `),
+                            scaledSize: new google.maps.Size(20, 20)
+                        }
+                    });
+                    
+                    markers.push(marker);
+                    marker.addListener('click', () => showFacilityDetails(facility, distance));
+                    
+                    // Create facility card
+                    const card = document.createElement('div');
+                    card.className = 'bg-white/70 backdrop-blur-sm rounded-2xl p-5 shadow-md border border-white/50 hover:shadow-lg hover:scale-[0.99] transition-all duration-200 cursor-pointer';
+                    card.onclick = () => showFacilityDetails(facility, distance);
+                    
+                    const rating = facility.rating ? facility.rating.toFixed(1) : 'N/A';
+                    const isOpen = facility.opening_hours?.open_now;
+                    
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1 pr-4">
+                                <h3 class="font-semibold text-lg text-gray-800 leading-tight mb-1">${facility.name}</h3>
+                                <p class="text-gray-600 text-sm leading-relaxed">${facility.vicinity || 'Address not available'}</p>
+                            </div>
+                            <div class="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap">
+                                ${distance.toFixed(1)} km
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="flex items-center space-x-1 text-amber-500">
+                                    <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium text-gray-700">${rating}</span>
+                                </div>
+                                ${isOpen !== undefined ? `
+                                    <div class="flex items-center space-x-1">
+                                        <div class="w-2 h-2 rounded-full ${isOpen ? 'bg-green-400' : 'bg-red-400'}"></div>
+                                        <span class="text-sm text-gray-600">${isOpen ? 'Open' : 'Closed'}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    `;
+                    
+                    facilityList.appendChild(card);
+                }
+            });
+            
+            document.getElementById('locationBtn').disabled = false;
+        }
+        
+        // Show facility details modal
+        function showFacilityDetails(facility, distance) {
+            const modal = document.getElementById('facilityModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalTitle.textContent = facility.name;
+            modalContent.innerHTML = '<div class="animate-pulse text-gray-500">Loading details...</div>';
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            service.getDetails({
+                placeId: facility.place_id,
+                fields: ['name', 'formatted_address', 'formatted_phone_number', 'website', 'opening_hours', 'rating', 'reviews']
+            }, (place, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    const openNow = place.opening_hours?.open_now;
+                    modalContent.innerHTML = `
+                        <div class="space-y-4">
+                            <div class="flex items-start space-x-3">
+                                <div class="w-5 h-5 text-gray-400 mt-0.5">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600 font-medium">Address</p>
+                                    <p class="text-gray-800">${place.formatted_address || 'Not available'}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-start space-x-3">
+                                <div class="w-5 h-5 text-gray-400 mt-0.5">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600 font-medium">Distance</p>
+                                    <p class="text-gray-800">${distance.toFixed(1)} km from your location</p>
+                                </div>
+                            </div>
+                            
+                            ${place.formatted_phone_number ? `
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-5 h-5 text-gray-400 mt-0.5">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 font-medium">Phone</p>
+                                        <a href="tel:${place.formatted_phone_number}" class="text-emerald-600 hover:text-emerald-700">${place.formatted_phone_number}</a>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${place.website ? `
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-5 h-5 text-gray-400 mt-0.5">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 font-medium">Website</p>
+                                        <a href="${place.website}" target="_blank" class="text-emerald-600 hover:text-emerald-700">Visit Website</a>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="flex items-center justify-between pt-2">
+                                ${place.rating ? `
+                                    <div class="flex items-center space-x-2">
+                                        <div class="flex items-center space-x-1 text-amber-500">
+                                            <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                                                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                                            </svg>
+                                            <span class="font-semibold text-gray-800">${place.rating}/5</span>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${openNow !== undefined ? `
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-3 h-3 rounded-full ${openNow ? 'bg-green-400' : 'bg-red-400'}"></div>
+                                        <span class="text-sm font-medium ${openNow ? 'text-green-700' : 'text-red-700'}">${openNow ? 'Open Now' : 'Closed'}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    modalContent.innerHTML = '<p class="text-gray-500">Unable to load facility details.</p>';
+                }
+            });
+        }
+        
+        // Helper functions
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('status');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+            
+            statusDiv.style.display = 'block';
+            statusText.textContent = message;
+            
+            if (type === 'success') {
+                statusDiv.className = 'mt-4 bg-green-50 text-green-700 rounded-2xl';
+                statusIcon.innerHTML = `
+                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                `;
+            } else if (type === 'error') {
+                statusDiv.className = 'mt-4 bg-red-50 text-red-700 rounded-2xl';
+                statusIcon.innerHTML = `
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                `;
+            }
+        }
+        
+        function showNoResults() {
+            const facilityList = document.getElementById('facilityList');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            resultsSection.style.display = 'block';
+            facilityList.innerHTML = `
+                <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-8 text-center">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">No facilities found</h3>
+                    <p class="text-gray-600">Try expanding your search area or contact local authorities.</p>
+                </div>
+            `;
+            
+            showStatus('error', 'No facilities found nearby');
+            document.getElementById('locationBtn').disabled = false;
+        }
+        
+        // Event listeners
+        document.getElementById('locationBtn').addEventListener('click', getUserLocation);
+        
+        // Modal functionality
+        function closeModal() {
+            document.getElementById('facilityModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+        
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', closeModal);
+        });
+        
+        document.getElementById('facilityModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+        
+        // Initialize
+        window.addEventListener('load', initMap);
+    </script>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWtEU1956MKost8rDCGnO8jmY8lfO_S4k&libraries=places&callback=initMap"></script>
+</body>
+</html>
