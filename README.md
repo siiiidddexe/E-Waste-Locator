@@ -1,5 +1,5 @@
-## PSCS-73 E-Waste-Locator CAI_23 
-# Developed By Siddhant Sundar (20221cai0001),Noel Sherin (20221cai0022), V Sai Kavshik (20221cai0033).
+# PSCS-73 E-Waste-Locator CAI_23 
+## Developed By Siddhant Sundar (20221cai0001),Noel Sherin (20221cai0022), V Sai Kavshik (20221cai0033).
 
 🎨 Design Enhancements:
 
